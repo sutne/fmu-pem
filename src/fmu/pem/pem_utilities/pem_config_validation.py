@@ -24,45 +24,27 @@ from .enum_defs import (
     MineralMixModel,
     OverburdenPressureTypes,
     TemperatureMethod,
-    VolumeFractions,
 )
 from .rpm_models import MineralProperties, PatchyCementRPM, RegressionRPM, TMatrixRPM
 
 
-class NTGFraction(BaseModel):
-    mode: SkipJsonSchema[Literal[VolumeFractions.NTG_SIM]]
-    from_porosity: bool = Field(
-        default=False,
-        description="If checked, net-to-gross is estimated from porosity parameter in "
-        "reservoir simulator `.INIT` file. Otherwise, net-to-gross is read "
-        "from the `NTG` parameter in the `.INIT` file.",
-    )
-
-
 class FractionFiles(BaseModel):
-    mode: SkipJsonSchema[Literal[VolumeFractions.VOL_FRAC]]
     rel_path_fractions: DirectoryPath = Field(
         default=Path("../../sim2seis/input/pem"),
         description="Directory for volume fractions",
     )
-    fractions_grid_file_name: Path = Field(
-        description="Grid definition of the volume fractions"
-    )
     fractions_prop_file_names: list[Path] = Field(description="Volume fractions")
-    fraction_is_ntg: bool = Field(
-        default=True,
-        description="In case of a single fraction, it can either be a real volume "
-        "fraction or a net-to-gross parameter. If there is more than one fraction, "
-        "they have to represent real volume fractions, and this will be ignored",
+    fractions_are_mineral_fraction: bool = Field(
+        default=False,
+        description="Fractions can either be mineral fractions or volume fractions."
+        "If they are mineral fractions,the sum of fractions and a"
+        "complement is 1.0. If they are volume fractions, the sum of"
+        "fractions, a complementand porosity is 1.0."
+        "Default value is False.",
     )
 
     @model_validator(mode="after")
     def check_fractions(self) -> Self:
-        full_fraction_grid = self.rel_path_fractions / self.fractions_grid_file_name
-        if not full_fraction_grid.exists():
-            raise FileNotFoundError(
-                f"fraction grid file is missing: {full_fraction_grid}"
-            )
         for frac_prop in self.fractions_prop_file_names:
             full_fraction_prop = self.rel_path_fractions / frac_prop
             if not full_fraction_prop.exists():
@@ -119,11 +101,10 @@ class RockMatrixProperties(BaseModel):
         "delete these minerals, but you can override their default values and/or "
         "ignore their definition).",
     )
-    volume_fractions: NTGFraction | FractionFiles = Field(
-        default=NTGFraction,
-        title="Mineral volume fractions",
-        description=r"Choice of volume fractions based on `NTG` from "
-        "simulator `.INIT` file or from grid property file ",
+    volume_fractions: FractionFiles = Field(
+        description="Choice of volume fraction files. Volume fractions are defined"
+        "in the geomodel, but they must be resampled to the simulator grid"
+        "when used in PEM",
     )
     fraction_names: List[str] = Field(
         description="Fraction names must match the names in the volume fractions file",
@@ -324,11 +305,12 @@ class Fluids(BaseModel):
     condensate: Oil | None = Field(
         default=None,
         title="Condensate properties",
-        description="Condensate is defined by the same set of parameters as oil, "
-        "optional setting for condensate cases",
+        description="Condensate model requires a similar set of parameters as"
+        "the oil model, this is an optional setting for condensate"
+        "cases",
     )
     fluid_mix_method: MixModelBrie | MixModelWood = Field(
-        default_factory=MixModelBrie,
+        default=MixModelWood,
         description="Selection between Wood's or Brie model. Wood's model gives more "
         "radical response to adding small amounts of gas in brine or oil",
     )
