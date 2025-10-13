@@ -19,6 +19,8 @@ from fmu.pem import INTERNAL_EQUINOR
 
 from .enum_defs import (
     CO2Models,
+    DifferenceAttribute,
+    DifferenceMethod,
     FluidMixModel,
     GasModels,
     MineralMixModel,
@@ -490,12 +492,13 @@ class PemConfig(BaseModel):
     results: Results = Field(
         description="Flags for saving results of the PEM",
     )
-    diff_calculation: Dict[str, List[Literal["ratio", "diff", "diffpercent"]]] = Field(
+    diff_calculation: Dict[DifferenceAttribute, List[DifferenceMethod]] = Field(
         description="Difference properties of the PEM can be calculated for the dates "
         "in the Eclipse `.UNRST` file. The settings decide which parameters "
         "difference properties will be generated for, and what kind of "
-        "difference calculation is run - normal difference, percent "
-        "difference or ratio"
+        "difference calculation is run - normal difference (`diff`), percent "
+        "difference (`diffperc`) or ratio (`ratio`). Multiple kinds of differences "
+        "can be estimated for each parameter"
     )
     global_params: SkipJsonSchema[FromGlobal | None] = Field(
         default=None,
@@ -515,13 +518,14 @@ class PemConfig(BaseModel):
 
     @field_validator("diff_calculation", mode="before")
     def to_list(cls, v: Dict) -> Dict:
-        v_keys = list(v.keys())
+        v_keys = [key.lower() for key in v]
         v_val = list(v.values())
         for i, val_item in enumerate(v_val):
             if not isinstance(val_item, list):
                 v_val[i] = [
                     val_item,
                 ]
+            v_val[i] = [v.lower() for v in v_val[i]]
         return dict(zip(v_keys, v_val))
 
     # Add global parameters used in the PEM
