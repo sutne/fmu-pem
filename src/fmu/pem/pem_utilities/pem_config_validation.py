@@ -404,11 +404,11 @@ class Gas(BaseModel):
 
 
 class MixModelWood(BaseModel):
-    method: SkipJsonSchema[FluidMixModel] = "wood"
+    method: FluidMixModel = "wood"
 
 
 class MixModelBrie(BaseModel):
-    method: SkipJsonSchema[FluidMixModel] = "brie"
+    method: FluidMixModel = "brie"
     brie_exponent: float = Field(
         default=3.0,
         description="Brie exponent selects the mixing curve shape, from linear mix "
@@ -424,6 +424,15 @@ class ConstantTemperature(BaseModel):
 
 class TemperatureFromSim(BaseModel):
     type: SkipJsonSchema[TemperatureMethod] = "from_sim"
+
+
+class SalinityFromSim(BaseModel):
+    enabled: bool = False
+
+    def __bool__(self):
+        return self.enabled
+
+    model_config = ConfigDict(title="Salinity from SIM")
 
 
 class PVTZone(BaseModel):
@@ -493,8 +502,8 @@ class Fluids(BaseModel):
         "radical response to adding small amounts of gas in brine or oil",
     )
     # Handling of salinity will be a common factor, not zone-based
-    salinity_from_sim: bool = Field(
-        default=False,
+    salinity_from_sim: SalinityFromSim = Field(
+        default_factory=SalinityFromSim,
         description="In most cases it is sufficient with a constant salinity "
         "setting for the reservoir, unless there is large contrast"
         "between formation water and injected water. If salinity is "
