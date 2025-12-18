@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import warnings
+from math import isclose
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -28,6 +29,9 @@ if INTERNAL_EQUINOR:
     from rock_physics_open.fluid_models import (
         saturations_below_bubble_point,  # noqa: F821
     )
+
+# Hard-code the default tolerance limit for fraction of cells below bubble point
+BUBBLE_POINT_FRACTION_TOLERANCE = 0.01
 
 
 def _saturation_triplet(
@@ -70,11 +74,30 @@ def _adjust_bubble_point(
             gas_gravity=oil_gas_gravity,
             temperature=temp,
         )
-        idx_below = pres <= bp
+        # Only consider cells where the oil saturation is positive
+        idx_below = np.logical_and(pres <= bp, so > 0.0)
         if np.any(idx_below):
+            # More than 1% of cells below bubble point will be regarded as an error
+            # situation if the gas Z-factor is set to default value of 1.0. If the
+            # user modifies the Z-factor, we regard cells below bubble point to be
+            # an expected situation and not an error.
+            frac_below = np.sum(idx_below) / pres.size
+            if frac_below > BUBBLE_POINT_FRACTION_TOLERANCE and isclose(
+                zone.gas_z_factor, 1.0
+            ):
+                raise ValueError(
+                    f"Fraction of cells with pressure below oil bubble point is "
+                    f"{frac_below:.3f}. "
+                    "If you experience this, please raise an issue in "
+                    "https://github.com/equinor/fmu-pem/issues. "
+                    "If this is an expected situation, add a "
+                    "gas Z-factor (deviation from an ideal gas) to the YAML parameter "
+                    "file for each PVTNUM zone, e.g.: 'gas_z_factor: 0.97' "
+                    "The gas Z-factor must deviate from 1.0."
+                )
             warnings.warn(
-                f"Detected pressure below bubble point for oil in "
-                f"{np.sum(idx_below)} cells"
+                f"Detected pressure below bubble point for oil in {np.sum(idx_below)} "
+                f"cells, this is {frac_below:.3f} of total number of cells."
             )
     except NotImplementedError:
         warnings.warn("Bubble point function unavailable; assuming above bubble point.")
