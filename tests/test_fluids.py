@@ -246,10 +246,10 @@ def mock_flag_models(monkeypatch):
 def test_accepts_single_and_list(sim_props_high_pressure, fluids, pvtnum_grid):
     res_single = effective_fluid_properties_zoned(
         sim_props_high_pressure, fluids, pvtnum_grid
-    )
+    )[0]
     res_list = effective_fluid_properties_zoned(
         [sim_props_high_pressure], fluids, pvtnum_grid
-    )
+    )[0]
     assert isinstance(res_single[0], EffectiveFluidProperties)
     assert np.allclose(res_single[0].density, res_list[0].density)
 
@@ -261,7 +261,7 @@ def test_condensate_overwrite(sim_props_with_condensate, fluids, pvtnum_grid):
     fluids.pvt_zones[0].calculate_condensate = True
     res = effective_fluid_properties_zoned(
         sim_props_with_condensate, fluids, pvtnum_grid
-    )[0]
+    )[0][0]
     assert res.density[0] == pytest.approx(200.0)
     assert res.density[1] == pytest.approx(600.0)
 
@@ -288,21 +288,22 @@ def test_co2_path(sim_props_high_pressure, fluids, pvtnum_grid, monkeypatch):
 
 
 def test_density_and_bulk_shapes(sim_props_high_pressure, fluids, pvtnum_grid):
-    res = effective_fluid_properties_zoned(
+    res, bp = effective_fluid_properties_zoned(
         sim_props_high_pressure, fluids, pvtnum_grid
-    )[0]
-    assert res.density.shape == res.bulk_modulus.shape
-    assert res.density.ndim == 1
-    assert np.all(res.bulk_modulus > 0.0)
+    )
+    assert res[0].density.shape == res[0].bulk_modulus.shape
+    assert bp[0]["below_bubble_point"].shape == res[0].bulk_modulus.shape
+    assert res[0].density.ndim == 1
+    assert np.all(res[0].bulk_modulus > 0.0)
     # Verify masked arrays are returned
-    assert isinstance(res.density, np.ma.MaskedArray)
-    assert isinstance(res.bulk_modulus, np.ma.MaskedArray)
+    assert isinstance(res[0].density, np.ma.MaskedArray)
+    assert isinstance(res[0].bulk_modulus, np.ma.MaskedArray)
 
 
 def test_list_multiple(
     sim_props_high_pressure, sim_props_with_condensate, fluids, pvtnum_grid
 ):
-    results = effective_fluid_properties_zoned(
+    results, _ = effective_fluid_properties_zoned(
         [sim_props_high_pressure, sim_props_with_condensate], fluids, pvtnum_grid
     )
     assert len(results) == 2
@@ -328,7 +329,7 @@ def test_above_bubble_point_succeeds(sim_props_high_pressure, pvtnum_grid):
     fluids_default = StubFluids(gas_z_factor=1.0)
     res = effective_fluid_properties_zoned(
         sim_props_high_pressure, fluids_default, pvtnum_grid
-    )[0]
+    )[0][0]
     assert isinstance(res, EffectiveFluidProperties)
     assert res.density.shape == (3,)
     assert np.all(res.bulk_modulus > 0.0)
@@ -339,9 +340,12 @@ def test_below_bubble_point_with_z_factor(sim_props_low_pressure, pvtnum_grid):
     fluids_with_z = StubFluids(gas_z_factor=0.95)
     # Should not raise an error, and should issue a warning instead
     with pytest.warns(UserWarning, match="Detected pressure below bubble point"):
-        res = effective_fluid_properties_zoned(
+        res, bp = effective_fluid_properties_zoned(
             sim_props_low_pressure, fluids_with_z, pvtnum_grid
-        )[0]
-    assert isinstance(res, EffectiveFluidProperties)
-    assert res.density.shape == (3,)
-    assert np.all(res.bulk_modulus > 0.0)
+        )
+    assert isinstance(res[0], EffectiveFluidProperties)
+    assert res[0].density.shape == (3,)
+    assert np.all(res[0].bulk_modulus > 0.0)
+    for key, value in bp[0].items():
+        assert key == "below_bubble_point"
+        assert value.shape == (3,)

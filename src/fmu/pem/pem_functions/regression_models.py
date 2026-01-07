@@ -15,6 +15,7 @@ from rock_physics_open.equinor_utilities.std_functions import (
 )
 
 from fmu.pem.pem_utilities import (
+    DryRockProperties,
     EffectiveFluidProperties,
     EffectiveMineralProperties,
     PressureProperties,
@@ -51,7 +52,9 @@ def gen_regression(
         Vp [m/s]
     """
     pol = np.polynomial.Polynomial(polynom_weights)
-    poly_val: np.ndarray = pol(porosity)
+    # Call to Polynomial class will return ndarray or float, depending on input.
+    # This is not recognised by the
+    poly_val: np.ndarray = pol(porosity)  # type: ignore
     return poly_val
 
 
@@ -110,7 +113,7 @@ def run_regression_models(
     pressure: list[PressureProperties],
     rock_matrix: RockMatrixProperties,
     vsh: np.ma.MaskedArray | None = None,
-) -> list[SaturatedRockProperties]:
+) -> tuple[list[SaturatedRockProperties], list[DryRockProperties]]:
     """Run regression models for saturated rock properties.
 
     Args:
@@ -127,9 +130,12 @@ def run_regression_models(
     Returns:
         list[SaturatedRockProperties]: Saturated rock properties for each time step.
             Only fluid properties change between time steps in this model.
+        list[DryRockProperties]: dry rock properties with bulk modulus [Pa], shear
+            modulus [Pa] and density [kg/m^3]
     """
 
     saturated_props = []
+    dry_props = []
     tmp_pres_over = None
     tmp_pres_form = None
     tmp_pres_depl = None
@@ -276,7 +282,12 @@ def run_regression_models(
         rho_sat = rho_dry + tmp_por * tmp_fl_prop_rho
         vp, vs = velocity(k_sat, mu, rho_sat)[0:2]
 
-        vp, vs, rho_sat = reverse_filter_and_restore(mask, vp, vs, rho_sat)
+        vp, vs, rho_sat, k_dry, mu, rho_dry = reverse_filter_and_restore(
+            mask, vp, vs, rho_sat, k_dry, mu, rho_dry
+        )
         saturated_props.append(SaturatedRockProperties(vp=vp, vs=vs, density=rho_sat))
+        dry_props.append(
+            DryRockProperties(bulk_modulus=k_dry, shear_modulus=mu, density=rho_dry)
+        )
 
-    return saturated_props
+    return saturated_props, dry_props
