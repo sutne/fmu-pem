@@ -5,6 +5,7 @@ from typing import Any, Self
 
 import numpy as np
 from pydantic import (
+    AliasChoices,
     BaseModel,
     ConfigDict,
     DirectoryPath,
@@ -15,6 +16,7 @@ from pydantic import (
 from pydantic.json_schema import SkipJsonSchema
 from pydantic_core.core_schema import ValidationInfo
 
+from fmu.datamodels.fmu_results.global_configuration import GlobalConfiguration
 from fmu.pem import INTERNAL_EQUINOR
 
 from .enum_defs import (
@@ -556,53 +558,51 @@ class Fluids(BaseModel):
         return v
 
 
-def possible_date_string(date_strings: list[str]) -> bool:
-    """
-    Validate a list of date strings in YYYYMMDD format.
+def date_to_string(date_obj: date) -> str:
+    return date_obj.strftime(format="%Y%m%d")
 
-    Args:
-        date_strings: list of strings to validate
 
-    Returns:
-        bool: True if all strings are valid dates
+class SeismicSurvey(BaseModel):
+    ecldate: list[str]
+    time: dict[str, str] | None = None
+    depth: dict[str, str] | None = None
 
-    Raises:
-        ValueError: If any string is not a valid date in YYYYMMDD format
-    """
-    for date_string in date_strings:
-        if len(date_string) != 8:
-            raise ValueError(
-                f"Invalid date format: '{date_string}' must be exactly 8 characters"
-            )
-        try:
-            date(
-                year=int(date_string[0:4]),
-                month=int(date_string[4:6]),
-                day=int(date_string[6:]),
-            )
-        except ValueError:
-            raise ValueError(
-                f"Invalid date: '{date_string}' must be a valid date in YYYYMMDD format"
-            )
-    return True
+    @field_validator("ecldate", mode="before")
+    def convert_ecldate_strings(cls, v: list[date]) -> list[str]:
+        return [date_to_string(date) for date in v]
+
+
+class SeismicSection(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    templatecube_4d: str = Field(
+        validation_alias=AliasChoices("4d_templatecube", "templatecube_4d"),
+        serialization_alias="4d_templatecube",
+    )
+    real_4d_cropped_path: Path
+    real_4d: dict[str, SeismicSurvey]
 
 
 class FromGlobal(BaseModel):
     grid_model: str
-    seis_dates: list[str]
-    diff_dates: list[list[str]]
-    global_config: dict[str, Any]
+    mod_dates: list[str] | None = None
+    mod_diffdates: list[list[str]] | None = None
+    obs_dates: list[str] | None = None
+    obs_diffdates: list[list[str]] | None = None
+    seismic: SeismicSection
+    global_config: GlobalConfiguration
 
-    @field_validator("seis_dates", mode="before")
-    def check_date_string(cls, v: list[str]) -> list[str]:
-        possible_date_string(v)
-        return v
+    @field_validator("mod_dates", "obs_dates", mode="before")
+    def make_date_strings(cls, v: list[date]) -> list[str] | None:
+        if v:
+            return [date_to_string(date) for date in v]
+        return None
 
-    @field_validator("diff_dates", mode="before")
-    def check_diffdate_string(cls, v: list[list[str]]) -> list[list[str]]:
-        for ll in v:
-            possible_date_string(ll)
-        return v
+    @field_validator("mod_diffdates", "obs_diffdates", mode="before")
+    def make_diffdate_strings(cls, v: list[list[str]]) -> list[list[str]] | None:
+        if v:
+            return [[date_to_string(date) for date in diffdate] for diffdate in v]
+        return None
 
 
 class PemPaths(BaseModel):
