@@ -1,71 +1,16 @@
-name: Build, test and (if release) deploy
+name: on-release # TODO: update filename to "on-release.yaml", requires updating configuration in PyPI (it only allows release from an exact workflow filepath)
 
 on:
-  push:
-    branches:
-      - main
   release:
     types:
       - published
-  pull_request:
 
 jobs:
   test:
     uses: ./.github/workflows/test.yaml
 
-  update-documentation:
-    name: Update Documentation
-    if: github.ref_name == 'main'
-    needs: test
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Node
-        uses: actions/setup-node@v6
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Install Dependencies
-        working-directory: ./documentation
-        run: npm ci
-
-      - name: Create JSON Schema
-        working-directory: ./documentation
-        run: npm run create-json-schema
-
-      - name: Build Documentation
-        working-directory: ./documentation
-        run: npm run docs:build
-
-      - name: Deploy Documentation to GitHub Pages
-        run: |
-          # Move the built documentation out of working directory, in order to delete everything else afterwards
-          cp -R ./documentation/docs/.vitepress/dist ../dist
-
-          git config --local user.email "fmu-pem-github-action"
-          git config --local user.name "fmu-pem-github-action"
-          git fetch origin gh-pages
-          git checkout -f --track origin/gh-pages
-          git clean -f -f -d -x
-          git rm -r *
-
-          cp -R ../dist/* .
-
-          git add .
-
-          if git diff-index --quiet HEAD; then
-            echo "No changes in documentation. Skip documentation deploy."
-          else
-            git commit -m "Update GitHub Pages"
-            git push "https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" gh-pages
-          fi
-
   build:
     name: Build Package
-    if: github.event_name == 'release'
     needs: test
     runs-on: ubuntu-latest
     steps:
@@ -95,7 +40,6 @@ jobs:
 
   deploy:
     name: Publish Package to PyPI
-    if: github.event_name == 'release'
     needs: build
     runs-on: ubuntu-latest
     environment:
