@@ -53,6 +53,7 @@ jobs:
           path: dist/
 
       - name: Build configuration file user interface
+        if: github.ref_name == 'main'
         working-directory: ./documentation
         run: |
           npm ci
