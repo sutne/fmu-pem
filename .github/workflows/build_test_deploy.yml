@@ -1,4 +1,5 @@
 name: Build, test and (if release) deploy
+
 on:
   push:
     branches:
@@ -10,49 +11,50 @@ on:
 
 jobs:
   build:
-    name: "Python ${{ matrix.python-version }}"
-    runs-on: "ubuntu-latest"
     strategy:
       matrix:
         python-version: ["3.11", "3.12"]
+    name: Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
-          cache: 'pip'
+          cache: pip
 
-      - name: Install dependencies
+      - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -e .[tests]
 
-#      - name: Run ruff format
+#      - name: "Ruff: format"
 #        run: ruff format . --diff
 
-      - name: Run ruff check
+      - name: "Ruff: check"
         run: ruff check .
 
-      - name: Test with pytest
+      - name: Pytest
         run: pytest
 
-      - name: Build a binary wheel and a source tarball
+      - name: Build Package
         if: github.event_name == 'release'
         run: |
           pip install build
           export SETUPTOOLS_SCM_PRETEND_VERSION_FOR_FMU_PEM=$GITHUB_REF_NAME
           python -m build
 
-      - name: Upload artifact
+      - name: Upload Package Artifact
         if: github.event_name == 'release' && matrix.python-version == '3.11'
         uses: actions/upload-artifact@v4
         with:
           name: Python dist
           path: dist/
 
-      - name: Build configuration file user interface
+      - name: Build Documentation
         if: github.ref_name == 'main'
         working-directory: ./documentation
         run: |
@@ -60,8 +62,7 @@ jobs:
           npm run create-json-schema
           npm run docs:build
 
-      - name: 📚 Update GitHub pages
-        # Update on merge to main
+      - name: Deploy Documentation to GitHub Pages
         if: github.ref_name == 'main'
         run: |
           # Move the built documentation out of working directory, in order to delete everything else afterwards
@@ -81,13 +82,12 @@ jobs:
           if git diff-index --quiet HEAD; then
             echo "No changes in documentation. Skip documentation deploy."
           else
-            git commit -m "Update Github Pages"
+            git commit -m "Update GitHub Pages"
             git push "https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" gh-pages
           fi
 
-
   deploy:
-    name: Upload release to PyPI
+    name: Publish Package to PyPI
     if: github.event_name == 'release'
     needs: build
     runs-on: ubuntu-latest
@@ -95,15 +95,16 @@ jobs:
       name: pypi
       url: https://pypi.org/p/fmu-pem
     permissions:
-      id-token: write  # required for Trusted Publishing to PyPI
+      id-token: write # required for Trusted Publishing to PyPI
 
     steps:
-      - uses: actions/download-artifact@v4
+      - name: Download Package Artifact
+        uses: actions/download-artifact@v4
         with:
           name: Python dist
           path: dist/
 
-      - name: Publish package distributions to PyPI
+      - name: Publish Package to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist/
