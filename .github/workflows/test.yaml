@@ -1,0 +1,31 @@
+on:
+  workflow_call:
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+    name: Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install Dependencies
+        run: pip install -e .[tests]
+
+#      - name: "Ruff: format"
+#        run: ruff format . --diff
+
+      - name: "Ruff: check"
+        run: ruff check .
+
+      - name: Pytest
+        run: pytest
