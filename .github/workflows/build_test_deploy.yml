@@ -56,6 +56,4 @@ jobs:
           path: dist/
 
       - name: Publish Package to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          packages-dir: dist/
+        run: echo "Don't actually attempt this from my fork"

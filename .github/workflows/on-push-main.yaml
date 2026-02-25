@@ -54,24 +54,4 @@ jobs:
         run: npm run docs:build
 
       - name: Deploy Documentation to GitHub Pages
-        run: |
-          # Move the built documentation out of working directory, in order to delete everything else afterwards
-          cp -R ./documentation/docs/.vitepress/dist ../dist
-
-          git config --local user.email "fmu-pem-github-action"
-          git config --local user.name "fmu-pem-github-action"
-          git fetch origin gh-pages
-          git checkout -f --track origin/gh-pages
-          git clean -f -f -d -x
-          git rm -r *
-
-          cp -R ../dist/* .
-
-          git add .
-
-          if git diff-index --quiet HEAD; then
-            echo "No changes in documentation. Skip documentation deploy."
-          else
-            git commit -m "Update GitHub Pages"
-            git push "https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" gh-pages
-          fi
+        run: echo "Don't actually attempt this from my fork"
