@@ -10,7 +10,7 @@ on:
   pull_request:
 
 jobs:
-  build:
+  test:
     strategy:
       matrix:
         python-version: ["3.11", "3.12"]
@@ -38,22 +38,16 @@ jobs:
       - name: Pytest
         run: pytest
 
-      - name: Build Package
-        if: github.event_name == 'release'
-        run: |
-          pip install build
-          export SETUPTOOLS_SCM_PRETEND_VERSION_FOR_FMU_PEM=$GITHUB_REF_NAME
-          python -m build
-
-      - name: Upload Package Artifact
-        if: github.event_name == 'release' && matrix.python-version == '3.11'
-        uses: actions/upload-artifact@v4
-        with:
-          name: Python dist
-          path: dist/
+  update-documentation:
+    name: Update Documentation
+    if: github.ref_name == 'main'
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Build Documentation
-        if: github.ref_name == 'main'
         working-directory: ./documentation
         run: |
           npm ci
@@ -61,7 +55,6 @@ jobs:
           npm run docs:build
 
       - name: Deploy Documentation to GitHub Pages
-        if: github.ref_name == 'main'
         run: |
           # Move the built documentation out of working directory, in order to delete everything else afterwards
           cp -R ./documentation/docs/.vitepress/dist ../dist
@@ -83,6 +76,36 @@ jobs:
             git commit -m "Update GitHub Pages"
             git push "https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" gh-pages
           fi
+
+  build:
+    name: Build Package
+    if: github.event_name == 'release'
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.11
+          cache: pip
+
+      - name: Install Dependencies
+        run: pip install -e .[tests]
+
+      - name: Build Package
+        run: |
+          pip install build
+          export SETUPTOOLS_SCM_PRETEND_VERSION_FOR_FMU_PEM=$GITHUB_REF_NAME
+          python -m build
+
+      - name: Upload Package Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Python dist
+          path: dist/
 
   deploy:
     name: Publish Package to PyPI
