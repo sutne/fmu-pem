@@ -3,7 +3,7 @@ on:
 
 jobs:
   release-please:
-    name: release-please
+    name: ""
     runs-on: ubuntu-latest
     steps:
       - name: release-please
