@@ -25,6 +25,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set up Python 3.11 # for JSON schema generation
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.11
+          cache: pip
+
+      - name: Install Python Dependencies
+        run: pip install .
+
       - name: Set up Node
         uses: actions/setup-node@v6
         with:
@@ -32,7 +41,7 @@ jobs:
           cache: npm
           cache-dependency-path: ./documentation/package-lock.json
 
-      - name: Install Dependencies
+      - name: Install Node Dependencies
         working-directory: ./documentation
         run: npm ci
 

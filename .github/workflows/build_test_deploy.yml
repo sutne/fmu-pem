@@ -24,7 +24,7 @@ jobs:
           cache: pip
 
       - name: Install Dependencies
-        run: pip install -e .[tests]
+        run: pip install .
 
       - name: Build Package
         run: |
