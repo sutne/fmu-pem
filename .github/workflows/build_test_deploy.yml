@@ -1,11 +1,9 @@
 name: Build, test and (if release) deploy
+
 on:
   push:
     branches:
       - main
-  release:
-    types:
-      - published
   pull_request:
 
 jobs:
@@ -38,10 +36,20 @@ jobs:
       - name: Test with pytest
         run: pytest
 
+  release-please:
+    name: release-please
+    if: github.ref_name == 'main'
+    needs: test
+    permissions:
+      issues: write
+      contents: write
+      pull-requests: write
+    uses: ./.github/workflows/release-please.yaml
+
   build:
     name: Build
-    if: github.event_name == 'release'
-    needs: test
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
