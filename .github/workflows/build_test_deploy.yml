@@ -27,9 +27,6 @@ jobs:
       - name: Install Dependencies
         run: pip install .[tests]
 
-#      - name: "Format: ruff"
-#        run: ruff format . --diff
-
       - name: "Lint: ruff"
         run: ruff check .
 
